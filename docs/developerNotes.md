@@ -23,9 +23,22 @@ The following commands that can be run on the executable as of now.
 
 Using Cobra and Viper as the main library to handle the CLI interface:
 
+Cobra is a library for creating powerful modern CLI applications.
+
 Link to Github: https://github.com/spf13/cobra
 
 ```bash
-go get -u github.com/spf13/cobra@latest
-go get -u github.com/spf13/viper@latest
+go get github.com/spf13/cobra@v1.9.1
+```
+
+Viper is a complete configuration solution for Go applications
+
+```bash
+go get github.com/spf13/viper@v1.20.1
+```
+
+Dependencies to scan local network to list all IP addresses currently connected to it.
+
+```bash
+go get github.com/hashicorp/mdns@v1.0.6
 ```
