@@ -1,0 +1,60 @@
+# Binaries for programs
+# For most projects, this is the name of your module or your main executable.
+# For example, if your module is 'github.com/user/my-app', you might add:
+# my-app
+# If you run 'go build -o output_binary_name', ignore that name:
+# output_binary_name
+
+# Compiled Go packages
+# Binaries for programs are built in the same directory as the source code by default.
+# Go programs can compile to various names based on the directory or go.mod name.
+# It's common to ignore any executable that might be built in the current directory.
+# This pattern matches all executable files (that don't have an extension)
+*.[oa]
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary for programs
+*_test
+*.test
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains IDEs (GoLand, IntelliJ IDEA)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Go Modules
+# Dependency downloads (by 'go mod download')
+vendor/
+
+# Module cache, typically found in GOPATH/pkg/mod
+# This is usually a global cache, but if it gets created locally for some reason, ignore it.
+# If you use 'go mod vendor', then the vendor/ directory above handles it.
+# go.sum # Often kept, but sometimes ignored for specific reasons (e.g., highly dynamic development)
+
+# Build cache
+# The Go build cache is usually global, but if it appears locally:
+.go_build_cache/
+
+# Coverage output
+*.out
+*.prof
+
+# Logs
+*.log
+log/
+logs/
+
+# Environment variables
+.env
+.env.*
+
+# Operating System files
+.DS_Store
+Thumbs.db
