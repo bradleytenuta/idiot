@@ -58,3 +58,6 @@ logs/
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Idiot Specific files to ignore
+*configuration.yaml

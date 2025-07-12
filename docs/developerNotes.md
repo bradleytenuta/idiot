@@ -9,14 +9,14 @@ go mod init com.bradleytenuta/idiot
 To build the Go CLI application into an executable.
 
 ```bash
-go build .\main.go
+go build .\idiot.go
 ```
 
 The following commands that can be run on the executable as of now.
 
 ```bash
-.\main.exe --help
-.\main.exe version
+.\idiot.exe --help
+.\idiot.exe version
 ```
 
 ## Downloading Dependencies:
