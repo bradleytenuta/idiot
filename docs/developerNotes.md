@@ -42,3 +42,10 @@ Dependencies to scan local network to list all IP addresses currently connected 
 ```bash
 go get github.com/hashicorp/mdns@v1.0.6
 ```
+
+## How to run tests:
+
+1. Navigate to your module's root directory
+2. Run the tests for the 'cmd' package
+
+`go test ./cmd`

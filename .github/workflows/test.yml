@@ -1,0 +1,40 @@
+name: Run All Unit Tests
+
+on:
+  # Run on pushes to any branch
+  push:
+    branches:
+      - '**'
+  # Also run on pull requests targeting the main branch
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test and Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'src/go.mod' # Automatically uses the Go version from your go.mod
+
+      - name: Run tests and generate coverage report
+        # The -race flag detects race conditions.
+        # -coverprofile generates a coverage report.
+        # -covermode=atomic is needed for accurate coverage with -race.
+        # The ./... pattern recursively runs tests in all subdirectories.
+        run: go test -v -race ./...
+        working-directory: ./src
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        working-directory: ./src
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
