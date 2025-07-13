@@ -49,12 +49,22 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
 
+      - name: Package release assets (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd release
+          zip -r ../idiot-${{ matrix.goos }}-${{ matrix.goarch }}.zip .
+
+      - name: Package release assets (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path release\* -DestinationPath idiot-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           # Create a unique artifact name for each build matrix combination
-          name: idiot-binary-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: release/idiot-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
+          name: release-package-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: idiot-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
   release:
     name: Create Release
@@ -73,7 +83,6 @@ jobs:
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "release-artifacts/**/*" # Upload all downloaded files as release assets
+          artifacts: "release-artifacts/**/*.zip" # Upload all downloaded zip files as release assets
           generateReleaseNotes: true # Automatically generate release notes from commits
           token: ${{ secrets.GITHUB_TOKEN }}
-
