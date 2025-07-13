@@ -5,11 +5,9 @@
   <p>
     <a href="https://github.com/bradleytenuta/idiot/actions"><img src="https://github.com/bradleytenuta/idiot/actions/workflows/test.yml/badge.svg" alt="Build Status"></a>
     <a href="https://codecov.io/gh/bradleytenuta/idiot"><img src="https://codecov.io/gh/bradleytenuta/idiot/branch/main/graph/badge.svg" alt="codecov"></a>
-    <a href="https://github.com/bradleytenuta/idiot/releases/latest"><img src="https://img.shields.io/github/v/release/bradleytenuta/idiot" alt="Latest Release"></a>
+    <a href="https://github.com/bradleytenuta/idiot/releases/latest"><img src="https://img.shields.io/github/v/release/bradleytenuta/idiot?include_prereleases" alt="Latest Release"></a>
   </p>
 </div>
-
-github pills here
 
 include why you would need this tool?
 
