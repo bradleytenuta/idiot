@@ -52,8 +52,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: idiot-binaries
-          path: release/
+          # Create a unique artifact name for each build matrix combination
+          name: idiot-binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: release/idiot-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
   release:
     name: Create Release
@@ -66,12 +67,13 @@ jobs:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: idiot-binaries
+          # Downloads all artifacts from the workflow run into a single directory.
+          path: release-artifacts
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "*" # Upload all downloaded files as release assets
+          artifacts: "release-artifacts/**/*" # Upload all downloaded files as release assets
           generateReleaseNotes: true # Automatically generate release notes from commits
           token: ${{ secrets.GITHUB_TOKEN }}
 

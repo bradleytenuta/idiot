@@ -49,3 +49,14 @@ go get github.com/hashicorp/mdns@v1.0.6
 2. Run the tests for the 'cmd' package
 
 `go test ./cmd`
+
+## Create a release:
+
+Run the following commands to trigger the release github action:
+
+Verion format must be `v[0-9]+\.[0-9]+\.[0-9]+`.
+
+```
+git tag v0.0.1
+git push --tags
+```
