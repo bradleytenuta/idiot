@@ -29,7 +29,6 @@ jobs:
         # -coverprofile generates a coverage report.
         # -covermode=atomic is needed for accurate coverage with -race.
         # The ./... pattern recursively runs tests in all subdirectories.
-        run: go test -v -race ./...
         working-directory: ./src
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
