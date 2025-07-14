@@ -55,14 +55,14 @@ func initConfig() {
 	if (err != nil) {
 		log.Fatalf("Error while reading configuration file: %v", err)
 	}
+
 	if (!exists) {
 		// Otherwise create config file with default values.
 		type Config struct {
 			NetworkName string `yaml:"network_name"`
 			SubnetSize string `yaml:"subnet_size"`
 		}
-		// TODO: maybe update to read in yaml file instead.
-		// TODO: Update all code to use log instead of fmt.
+		// TODO: Have build/release job create config file from these defaults.
 		defaultConfig := Config{
 			NetworkName: "<network name here>",
 			SubnetSize: "24",

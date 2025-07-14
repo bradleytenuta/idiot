@@ -14,7 +14,7 @@ type Device struct {
 	Hostname      string                 // The hostname, discovered via mDNS or reverse DNS lookup.
 	Services      []*mdns.ServiceEntry   // A slice of services discovered on the device via mDNS.
 	CanConnectSSH bool                   // A flag indicating whether an SSH connection can be established on port 22.
-  Sources       []string               // How the device was discovered (e.g., "mDNS", "ICMP").
+  	Sources       []string               // How the device was discovered (e.g., "mDNS", "ICMP").
 }
 
 // makes Device implement zerolog.LogObjectMarshaler for structured logging.
