@@ -42,7 +42,7 @@ func enrichDeviceData(device *model.Device) *model.Device {
 }
 
 // In your main scanning logic, after you get a successful ICMP reply for an IP:
-func ProcessDiscoveredIPs(discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
+func PerformReverseDnsLookUp(discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
 	// A WaitGroup is used to wait for all the concurrent ping operations to complete.
   	var wg sync.WaitGroup
 

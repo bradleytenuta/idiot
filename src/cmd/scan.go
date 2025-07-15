@@ -4,11 +4,10 @@ import (
   "fmt"
   "time"
   "sync"
-  "os"
   "github.com/spf13/cobra"
-  "github.com/rs/zerolog"
   "com.bradleytenuta/idiot/internal/model"
   "com.bradleytenuta/idiot/internal/network"
+  "com.bradleytenuta/idiot/internal/ui"
 )
 
 // runScan is the main execution function for the scan command.
@@ -18,6 +17,7 @@ func runScan(cmd *cobra.Command, args []string) {
   // --- Network Setup ---
   networkAddr, broadcastAddr, iface, err := network.GetInternetFacingNetworkInfo()
   if err != nil {
+    // TODO: Change to debug and implement debug in configuration yaml.
     fmt.Printf("Error setting up network: %v\n", err)
     return
   }
@@ -55,17 +55,10 @@ func runScan(cmd *cobra.Command, args []string) {
   sshWg.Wait() // Wait for all SSH checks to complete.
 
   // --- Discovery Phase 3: reverse DNS (rDNS) lookup. This asks a DNS server, "What hostname corresponds to this IP address?" ---
-  network.ProcessDiscoveredIPs(discoveredDevices, &mu)
+  network.PerformReverseDnsLookUp(discoveredDevices, &mu)
 
-  // --- Final Report ---
-  // Initialize a console-friendly logger for structured, readable output.
-	log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.Kitchen}).With().Timestamp().Logger()
-	log.Info().Msg("--- Discovered Devices ---")
-	// Iterate through the map of discovered devices and log their details using the custom marshaler.
-	for _, dev := range discoveredDevices {
-    // .Send() is a performant way to dispatch the log event.
-    log.Info().Object("device", dev).Send()
-  }
+  // --- User Selection Phase ---
+  ui.CreateInteractiveSelect(discoveredDevices) // Returns the user selecte device or nil if user cancelled or none found.
 }
 
 // init function registers the scan command with the root command.
