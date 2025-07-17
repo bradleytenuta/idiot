@@ -1,52 +1,55 @@
 package cmd
-
+// TODO: This looks terrible in windows CMD.
 import (
-  "fmt"
-  "github.com/spf13/cobra"
-  "github.com/spf13/viper"
-  "log"
   "os"
+  "github.com/spf13/cobra"
+  "github.com/rs/zerolog/log"
   "golang.org/x/crypto/ssh"
   "golang.org/x/term"
   "com.bradleytenuta/idiot/internal/model"
   "com.bradleytenuta/idiot/internal/network"
   "com.bradleytenuta/idiot/internal/ui"
+  "com.bradleytenuta/idiot/internal"
 )
 
-// init function registers the scan command with the root command.
 func init() {
   rootCmd.AddCommand(sshCmd)
 }
 
-// scanCmd defines the 'scan' command, its flags, and the main execution logic.
 var sshCmd = &cobra.Command{
   Use:    "ssh",
-  Short:  "",
-  Long:   ``,
+  Short:  "Select the IOT device to SSH into.",
+  Long:   `Select one of the saved IOT devices from the scan command to SSH into.`,
   Run:    runSsh,
 }
 
-// GetSelectedDevicesFromConfig reads the configuration and returns a slice of fully-formed *model.Device.
-func getSelectedDevicesFromConfig() ([]model.Device, error) {
-	// Create a slice to hold the data from the config file.
-	var configDevices []model.Device
-
-	// Unmarshal the config data directly into our slice of serializable structs.
-	if err := viper.UnmarshalKey("selected_devices", &configDevices); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal 'selected_devices' from config: %w", err)
-	}
-
-	return configDevices, nil
+func runSsh(cmd *cobra.Command, args []string) {
+  // We are calling a function that returns another function, and then deferring the execution of the returned function.
+  // This uses the function returned by initTerminal  schedules it to be executed right before the surrounding function exits.
+  defer ui.InitTerminal()()
+  addr, user, password, err := getLoginDetails()
+  if err != nil {
+    return
+  }
+  client, err := getClient(addr, user, password)
+  if err != nil {
+    log.Error().Msgf("Failed to create client: %v", err)
+    return
+  }
+  defer client.Close()
+  session, err := client.NewSession()
+  if err != nil {
+    log.Error().Msgf("Failed to create session: %v", err)
+    return
+  }
+	defer session.Close()
+  handleInteractiveSession(session)
 }
 
-// TODO: This looks terrible in windows CMD.
-func runSsh(cmd *cobra.Command, args []string) {
-  // On Windows, this enables virtual terminal processing, which is required
-  // for both promptui and the SSH session's ANSI escape codes to work correctly.
-  // It returns a cleanup function that is deferred to restore the terminal state.
-  defer initTerminal()()
+func getLoginDetails() (string, string, string, error) {
+  savedDevices := internal.ReadIotDevices()
 
-  savedDevices, _ := getSelectedDevicesFromConfig()
+  // TODO: Could we replace the map with a slice?
   // We will create a map where the key is the device's Name.
   deviceMap := make(map[string]*model.Device)
   // Iterate over the slice by index. This is crucial for getting
@@ -58,81 +61,97 @@ func runSsh(cmd *cobra.Command, args []string) {
       deviceMap[device.AddrV4] = device
   }
 
-  selectedDevice := ui.CreateInteractiveSelect(deviceMap)
-  
-  user := ui.GetPromptInput("Username", 0)
-  password := ui.GetPromptInput("Password", '*')
-  
-  // replace with select from saved IPs.
-  addr := selectedDevice.AddrV4
-  addr = network.AddSshPortIfMissing(addr)
+  selectedDevice, err := ui.CreateInteractiveSelect(deviceMap, "Select an IOT Device to SSH into")
+  if err != nil {
+    return "", "", "", err
+  }
 
-	// 3. Configure the SSH client
+  user, err := ui.GetPromptInput("Username", 0)
+  if err != nil {
+    log.Error().Msgf("Failed to get username: %v", err)
+    return "", "", "", err
+  }
+
+  password, err := ui.GetPromptInput("Password", '*')
+  if err != nil {
+    log.Error().Msgf("Failed to get password: %v", err)
+    return "", "", "", err
+  }
+
+  addr, err := network.AddPort(selectedDevice.AddrV4)
+  if err != nil {
+    log.Error().Msgf("Invalid address: %v", err)
+    return "", "", "", err
+  }
+  return addr, user, password, nil
+}
+
+func getClient(addr string, user string, password string) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		// IMPORTANT: In a real-world application, you should use a more secure
+		// TODO: IMPORTANT: In a real-world application, you should use a more secure
 		// HostKeyCallback, like ssh.FixedHostKey or one that checks a known_hosts file.
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-
-	// 4. Establish the SSH connection
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		log.Fatalf("Failed to dial: %v", err)
+    return nil, err
 	}
-	defer client.Close()
-	fmt.Printf("Connected to %s\n", addr)
+  return client, nil
+}
 
-	// 5. Create a new session
-	session, err := client.NewSession()
-	if err != nil {
-		log.Fatalf("Failed to create session: %v", err)
-	}
-	defer session.Close()
-
-	// 6. Set up the interactive terminal
-	// Get file descriptors for stdin and stdout
+func handleInteractiveSession(session *ssh.Session) {
+  // A file descriptor is a small, non-negative integer that a process uses to identify an open file or other I/O resource
+  // Gets the file descriptor for standard input (os.Stdin). This will almost always be 0.
 	inFd := int(os.Stdin.Fd())
+  // Gets the file descriptor for standard output (os.Stdout). This will almost always be 1.
 	outFd := int(os.Stdout.Fd())
 
 	// Check if the session is running in an interactive terminal
 	if !term.IsTerminal(inFd) || !term.IsTerminal(outFd) {
-		log.Fatalf("Cannot create an interactive SSH session: Standard I/O is not a terminal.")
+		log.Error().Msg("We cannot create an interactive SSH session if the Standard I/O is not a terminal!")
+    return
 	}
 
-	// Put the local terminal into raw mode
+  // Putting the terminal into raw mode means switching it from its normal, line-by-line "cooked" 
+  // mode to a state where your program receives every single keystroke exactly as it's typed, immediately.
+  // This is need because SSH client needs to pass every keystroke directly to the remote server so that the remote shell
+  // can handle things like command history (up arrow) and auto-completion (Tab). Your local terminal can't be allowed to interfere.
 	oldState, err := term.MakeRaw(inFd)
 	if err != nil {
-		log.Fatalf("Failed to put terminal in raw mode: %v", err)
+		log.Error().Msgf("Failed to put terminal in raw mode: %v", err)
+    return
 	}
+  // If the application crashes or exits without restoring the terminal's oldState, the user's shell will be left in raw mode.
 	defer term.Restore(inFd, oldState)
 
 	// Get terminal dimensions and request a PTY from the remote server
 	width, height, err := term.GetSize(outFd)
 	if err != nil {
-		log.Fatalf("Failed to get terminal size: %v", err)
+		log.Error().Msgf("Failed to get terminal size: %v", err)
+    return
 	}
 
-	// Request a pseudo-terminal (pty) with the correct dimensions
+  // Creates a pseudo-terminal (pty) with the same dimensions as the local terminal. We
+  // are using the existing terminal, but we are temporarily changing its behavioral mode for the duration of the SSH session.
 	if err := session.RequestPty("xterm-256color", height, width, ssh.TerminalModes{}); err != nil {
-		log.Fatalf("Request for pty failed: %v", err)
+		log.Error().Msgf("Request for pty failed: %v", err)
+    return
 	}
 
-	// 7. Connect the local terminal I/O to the remote session
+	// Connects the session's standard input, output, and error streams to the SSH session.
 	session.Stdin = os.Stdin
 	session.Stdout = os.Stdout
 	session.Stderr = os.Stderr
 
-	// 8. Start the remote shell
 	if err := session.Shell(); err != nil {
-		log.Fatalf("Failed to start shell: %v", err)
+		log.Error().Msgf("Failed to start shell: %v", err)
+    return
 	}
 
-	// 9. Wait for the session to finish (user logs out)
-	// The error is ignored because it's typically "wait: remote command exited"
-	// when the user types `exit`.
-	_ = session.Wait()
+  // Wait for the session to end, usually when the user types `exit`.
+	session.Wait()
 }

@@ -10,9 +10,9 @@ func init() {
 
 var versionCmd = &cobra.Command{
   Use:   "version",
-  Short: "Print the version number of Hugo",
-  Long:  `All software has versions. This is Hugo's`,
+  Short: "Print the version number of Idiot",
+  Long:  `All software has versions. This is Idiots's`,
   Run: func(cmd *cobra.Command, args []string) {
-    cmd.Println("Hugo Static Site Generator v0.9 -- HEAD")
+    cmd.Println("1.0.0")
   },
 }

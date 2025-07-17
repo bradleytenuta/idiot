@@ -72,7 +72,7 @@ func runScan(cmd *cobra.Command, args []string) {
   network.PerformReverseDnsLookUp(discoveredDevices, &mu)
 
   // --- User Selection Phase ---
-  selectedDevice := ui.CreateInteractiveSelect(discoveredDevices) // Returns the user selecte device or nil if user cancelled or none found.
+  selectedDevice, _ := ui.CreateInteractiveSelect(discoveredDevices, "Select an IOT device to save") // Returns the user selecte device or nil if user cancelled or none found.
   if selectedDevice != nil {
     // Retrieve the current list of devices from the configuration.
     var configDevices []model.Device

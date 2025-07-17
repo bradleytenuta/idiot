@@ -2,28 +2,22 @@ package cmd
 
 import (
 	"os"
-	"log"
-	"gopkg.in/yaml.v3"
 	"path/filepath"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/rs/zerolog"
+    "github.com/rs/zerolog/log"
+	"com.bradleytenuta/idiot/internal"
 )
 
 var (
-	// Used for flags.
-	configFilePath     string
-	userLicense        string
-
 	rootCmd = &cobra.Command{
-		Use:   "cobra-cli",
-		Short: "A generator for Cobra based Applications",
-		Long: `Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+		Use:   "idiot",
+		Short: "Enables you to identify and manage internet of things (IOT)",
+		Long: `A GO command line interface, that enables you to identify and manage internet of things (IOT) on your local network.`,
 	}
 )
 
-// Execute executes the root command.
 func Execute() error {
 	return rootCmd.Execute()
 }
@@ -32,60 +26,30 @@ func init() {
 	cobra.OnInitialize(initConfig)
 }
 
-func fileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil // File or directory exists
-	}
-	if os.IsNotExist(err) {
-		return false, nil // File or directory does not exist
-	}
-	return false, err // Other error (e.g., permissions)
-}
-
 func initConfig() {
-	executablePath, err := os.Executable()
-	configFilePath = filepath.Join(filepath.Dir(executablePath), "configuration.yaml")
-	if err != nil {
-		log.Fatalf("Error getting executable path: %v", err)
-	}
-
-	// Read config file if present:
-	exists, err := fileExists(configFilePath)
-	if (err != nil) {
-		log.Fatalf("Error while reading configuration file: %v", err)
-	}
+	executablePath, _ := os.Executable()
+	configFilePath := filepath.Join(filepath.Dir(executablePath), "configuration.yaml")
+	exists, _ := internal.FileExists(configFilePath)
 
 	if (!exists) {
-		// Otherwise create config file with default values.
-		// TODO: move to model package.
-		type Config struct {
-			SubnetSize string `yaml:"subnet_size"`
-			// SelectedDevices will hold a list of devices.
-			// Using a slice of interface{} for flexibility.
-			SelectedDevices []interface{} `yaml:"selected_devices,omitempty"`
-		}
-		defaultConfig := Config{
-			SubnetSize: "24",
-		}
-		yamlBytes, err := yaml.Marshal(defaultConfig)
+		err := internal.WriteConfigFile(configFilePath)
 		if err != nil {
-			log.Fatalf("Error marshalling YAML: %v", err)
+			log.Error().Msgf("Error writing new configuration file: %v", err)
+			return
 		}
-		err = os.WriteFile(configFilePath, yamlBytes, 0644)
-		if err != nil {
-			log.Fatalf("Error writing YAML to file %s: %v", configFilePath, err)
-		}
-		log.Printf("Successfully wrote YAML content to '%s'\n", configFilePath)
 	}
 
-	// store config file
 	viper.SetConfigFile(configFilePath)
 	viper.SetConfigType("yaml")
-	if err := viper.ReadInConfig(); err == nil {
-		// TODO replace log and print with zerolog.
-		log.Printf("Using config file: %s", viper.ConfigFileUsed())
-	} else {
-		log.Fatalf("Error when finding config file: %v", err)
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Error().Msgf("Error using configuration file: %v", err)
+		return
 	}
+
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+    if viper.GetBool("debug") {
+        zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Debug().Msg("Debug logs are turned on!")
+    }
 }

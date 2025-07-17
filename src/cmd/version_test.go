@@ -25,10 +25,9 @@ func TestVersionCmd(t *testing.T) {
 	// Get the output from the buffer as a string.
 	got := buf.String()
 	// Define the expected output. Note that cmd.Println adds a newline character.
-	expected := "Hugo Static Site Generator v0.9 -- HEAD\n"
+	expected := "1.0.0\n"
 
 	if got != expected {
 		t.Errorf("unexpected version output.\ngot:  %q\nwant: %q", got, expected)
 	}
 }
-
