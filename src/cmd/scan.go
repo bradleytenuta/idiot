@@ -4,11 +4,26 @@ import (
   "fmt"
   "time"
   "sync"
+  "log"
   "github.com/spf13/cobra"
+	"github.com/spf13/viper"
   "com.bradleytenuta/idiot/internal/model"
   "com.bradleytenuta/idiot/internal/network"
   "com.bradleytenuta/idiot/internal/ui"
 )
+
+// init function registers the scan command with the root command.
+func init() {
+  rootCmd.AddCommand(scanCmd)
+}
+
+// scanCmd defines the 'scan' command, its flags, and the main execution logic.
+var scanCmd = &cobra.Command{
+  Use:    "scan",
+  Short:  "Scan the local network of this device and list the IP Addresses of devices connected to it.",
+  Long:   `Scan the local network of this device and list the IP Addresses of devices connected to it. Including IPv4, IPv6 and ports reachable.`,
+  Run:    runScan,
+}
 
 // runScan is the main execution function for the scan command.
 // It orchestrates the network setup, discovery phases (mDNS, ICMP),
@@ -39,7 +54,6 @@ func runScan(cmd *cobra.Command, args []string) {
   // TODO: A more robust solution would use a context with a timeout for the entire scan operation.
   time.Sleep(7 * time.Second)
 
-  // TODO: 192.168.86.21 = Raspberry Pi 4
   // --- SSH Check Phase ---
   // Concurrently check for SSH availability on all discovered devices.
   var sshWg sync.WaitGroup
@@ -49,7 +63,7 @@ func runScan(cmd *cobra.Command, args []string) {
     go func(d *model.Device) {
       defer sshWg.Done() // This ensures that the WaitGroup's counter is decremented when the goroutine finishes, regardless of how it exits.
       // For each device, check if the SSH port is open and update its status.
-      d.CanConnectSSH = network.CheckSSH(d.AddrV4.String())
+      d.CanConnectSSH = network.CheckSSH(d.AddrV4)
     }(dev) // Pass the current device pointer to the goroutine to avoid closure issues.
   }
   sshWg.Wait() // Wait for all SSH checks to complete.
@@ -58,22 +72,45 @@ func runScan(cmd *cobra.Command, args []string) {
   network.PerformReverseDnsLookUp(discoveredDevices, &mu)
 
   // --- User Selection Phase ---
-  ui.CreateInteractiveSelect(discoveredDevices) // Returns the user selecte device or nil if user cancelled or none found.
-}
+  selectedDevice := ui.CreateInteractiveSelect(discoveredDevices) // Returns the user selecte device or nil if user cancelled or none found.
+  if selectedDevice != nil {
+    // Retrieve the current list of devices from the configuration.
+    var configDevices []model.Device
+    if err := viper.UnmarshalKey("selected_devices", &configDevices); err != nil {
+      log.Fatalf("Failed to read 'selected_devices' from config: %v", err)
+    }
 
-// init function registers the scan command with the root command.
-func init() {
-  rootCmd.AddCommand(scanCmd)
-}
+    // Check for duplicates using the string representation of the IP address.
+    isDuplicate := false
+    for _, cd := range configDevices {
+      // Compare the string IP from the config with the string IP of the new device.
+      if cd.AddrV4 == selectedDevice.AddrV4 {
+        isDuplicate = true
+        break
+      }
+    }
 
-// scanCmd defines the 'scan' command, its flags, and the main execution logic.
-var scanCmd = &cobra.Command{
-  Use:    "scan",
-  Short:  "Scan the local network of this device and list the IP Addresses of devices connected to it.",
-  Long:   `Scan the local network of this device and list the IP Addresses of devices connected to it. Including IPv4, IPv6 and ports reachable.`,
-  Run:    runScan,
-}
+    if isDuplicate {
+      log.Printf("Device '%s' is already in the list. No changes made.", selectedDevice.AddrV4)
+    } else {
+      // Append the new, serializable device to the list.
+      // TODO: Trying to save a device i have a pointer to, to the config file.
+      configDevices = append(configDevices, *selectedDevice)
 
+      // Set the updated slice back into viper.
+      viper.Set("selected_devices", configDevices)
+
+      // Write the changes to the configuration file.
+      if err := viper.WriteConfig(); err != nil {
+        log.Fatalf("Error writing configuration file: %v", err)
+      }
+
+      log.Printf("Successfully added '%s' to 'selected_devices' in the configuration file.", selectedDevice.AddrV4)
+    }
+  } else {
+    log.Println("No device selected. Configuration not updated.")
+  }
+}
 // Important note on ARP cache:
 // After a successful ping, the device's MAC address should be in your system's ARP cache.
 // Retrieving this from Go directly is OS-dependent and often involves:

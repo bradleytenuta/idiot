@@ -3,6 +3,8 @@ package network
 import (
   "net"
   "time"
+  "strings"
+  "log"
 )
 
 // checkSSH attempts to connect to the SSH port (22) on a given host.
@@ -18,4 +20,17 @@ func CheckSSH(host string) bool {
 	// It's good practice to close the connection immediately if we only care about reachability.
 	_ = conn.Close()
 	return true
+}
+
+// Add default SSH port 22 if not specified
+func AddSshPortIfMissing(addr string) string {
+  if _, _, err := net.SplitHostPort(addr); err != nil {
+		if strings.Contains(err.Error(), "missing port") {
+			addr = net.JoinHostPort(addr, "22")
+		} else {
+      // TODO: Throw error here.
+			log.Fatalf("Invalid address: %v", err)
+		}
+	}
+  return addr
 }

@@ -58,13 +58,14 @@ func initConfig() {
 
 	if (!exists) {
 		// Otherwise create config file with default values.
+		// TODO: move to model package.
 		type Config struct {
-			NetworkName string `yaml:"network_name"`
 			SubnetSize string `yaml:"subnet_size"`
+			// SelectedDevices will hold a list of devices.
+			// Using a slice of interface{} for flexibility.
+			SelectedDevices []interface{} `yaml:"selected_devices,omitempty"`
 		}
-		// TODO: Have build/release job create config file from these defaults.
 		defaultConfig := Config{
-			NetworkName: "<network name here>",
 			SubnetSize: "24",
 		}
 		yamlBytes, err := yaml.Marshal(defaultConfig)

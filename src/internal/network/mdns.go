@@ -59,19 +59,18 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
 
       // If the device hasn't been seen before, create a new entry in the map.
       if _, exists := discoveredDevices[ipStr]; !exists {
-        discoveredDevices[ipStr] = &model.Device{AddrV4: entry.AddrV4, AddrV6: entry.AddrV6IPAddr, Hostname: modelName}
+        discoveredDevices[ipStr] = &model.Device{AddrV4: entry.AddrV4.String(), AddrV6: entry.AddrV6IPAddr.String(), Hostname: modelName}
       } else {
         if discoveredDevices[ipStr].Hostname == "" {
           discoveredDevices[ipStr].Hostname = modelName
         }
-        if discoveredDevices[ipStr].AddrV6 == nil {
-          discoveredDevices[ipStr].AddrV6 = entry.AddrV6IPAddr
+        if discoveredDevices[ipStr].AddrV6 == "" {
+          discoveredDevices[ipStr].AddrV6 = entry.AddrV6IPAddr.String()
         }
       }
 
       discoveredDevices[ipStr].AddSource("mDNS")
-      // Append the discovered service to the device's list of services. There can be multiple services per device.
-      discoveredDevices[ipStr].Services = append(discoveredDevices[ipStr].Services, entry)
+
       // Unlock the mutex after modification.
       mu.Unlock()
     }

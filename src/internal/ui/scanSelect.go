@@ -2,10 +2,12 @@ package ui
 
 import (
   "fmt"
+  "log"
   "com.bradleytenuta/idiot/internal/model"
   "github.com/manifoldco/promptui"
 )
 
+// TODO: Update to provide label.
 func CreateInteractiveSelect(discoveredDevices map[string]*model.Device) *model.Device {
 	// Convert the map of discovered devices into a slice for the prompt.
   devices := make([]*model.Device, 0, len(discoveredDevices))
@@ -22,14 +24,14 @@ func CreateInteractiveSelect(discoveredDevices map[string]*model.Device) *model.
   // Define custom templates for promptui to display device information nicely.
   templates := &promptui.SelectTemplates{
     Label:    "{{ . }}?",
-    Active:   "▶ {{ .AddrV4.String | cyan }} {{ if ne .Hostname \"\" }} ({{ .Hostname | green }}) {{ end }}",
-    Inactive: "  {{ .AddrV4.String | faint }} {{ if ne .Hostname \"\" }} ({{ .Hostname | faint }}) {{ end }}",
-    Selected: "✔ You selected {{ .AddrV4.String | green }}{{ if ne .Hostname \"\" }} ({{ .Hostname | green }}){{ end }}",
+    Active:   "▶ {{ .AddrV4 | cyan }} {{ if ne .Hostname \"\" }} ({{ .Hostname | green }}) {{ end }}",
+    Inactive: "  {{ .AddrV4 | faint }} {{ if ne .Hostname \"\" }} ({{ .Hostname | faint }}) {{ end }}",
+    Selected: "✔ You selected {{ .AddrV4 | green }}{{ if ne .Hostname \"\" }} ({{ .Hostname | green }}){{ end }}",
     Details: `
 --------- Device Details ----------
-{{ "IP Address:" | faint }}	{{ .AddrV4.String }}
+{{ "IP Address:" | faint }}	{{ .AddrV4 }}
 {{ "Hostname:" | faint }}	{{ if ne .Hostname "" }}{{ .Hostname }}{{ else }}N/A{{ end }}
-{{ "MAC Address:" | faint }}	{{ if .MAC }}{{ .MAC.String }}{{ else }}N/A{{ end }}
+{{ "MAC Address:" | faint }}	{{ if .MAC }}{{ .MAC }}{{ else }}N/A{{ end }}
 {{ "SSH Ready:" | faint }}	{{ .CanConnectSSH }}
 {{ "Sources:" | faint }}	{{ .Sources }}`,
   }
@@ -56,11 +58,27 @@ func CreateInteractiveSelect(discoveredDevices map[string]*model.Device) *model.
   selectedDevice := devices[i]
 
   fmt.Println("--- Selected Device ---")
-  fmt.Printf("  IP Address:     %s\n", selectedDevice.AddrV4.String())
+  fmt.Printf("  IP Address:     %s\n", selectedDevice.AddrV4)
   fmt.Printf("  Hostname:       %s\n", selectedDevice.Hostname)
-  fmt.Printf("  MAC Address:    %s\n", selectedDevice.MAC.String())
+  fmt.Printf("  MAC Address:    %s\n", selectedDevice.MAC)
   fmt.Printf("  SSH Ready:      %t\n", selectedDevice.CanConnectSSH)
   fmt.Printf("  Discovered via: %v\n", selectedDevice.Sources)
 
   return selectedDevice
+}
+
+// TODO: Rename file or move.
+func GetPromptInput(label string, mask rune) string {
+	prompt := promptui.Prompt{
+		Label: label,
+	}
+  if mask != 0 {
+		prompt.Mask = mask
+	}
+	result, err := prompt.Run()
+	if err != nil {
+    // TODO: Throw error here.
+    log.Fatalf("Prompt for '%s' failed: %v", label, err)
+  }
+  return result
 }

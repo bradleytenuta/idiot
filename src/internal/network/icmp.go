@@ -98,7 +98,7 @@ func PerformIcmpScan(networkAddr, broadcastAddr net.IP, discoveredDevices map[st
         // If the device is new, add it to the map
         // TODO: Is there any more info we can extract from the ICMP reply?
         if _, exists := discoveredDevices[ipStr]; !exists {
-          discoveredDevices[ipStr] = &model.Device{AddrV4: ip}
+          discoveredDevices[ipStr] = &model.Device{AddrV4: ip.String()}
         }
         discoveredDevices[ipStr].AddSource("ICMP")
 

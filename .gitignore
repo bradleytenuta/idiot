@@ -61,3 +61,4 @@ Thumbs.db
 
 # Idiot Specific files to ignore
 *configuration.yaml
+*.temp

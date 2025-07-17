@@ -12,7 +12,7 @@ import (
 
 // enrichDeviceData takes a device with an IP and adds more information, like a hostname.
 func enrichDeviceData(device *model.Device) *model.Device {
-	ipStr := device.AddrV4.String()
+	ipStr := device.AddrV4
 
 	// Perform a reverse DNS lookup to get the hostname.
 	// We use a context with a timeout to avoid waiting too long for a non-responsive lookup.
