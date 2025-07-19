@@ -13,7 +13,7 @@ linters:
   disable-all: true
   enable:
     # Formatting and imports
-    - gofmt
+    - gofumpt # A stricter formatter than gofmt
     - goimports
     # Best practice and bug prevention
     - errcheck
@@ -21,6 +21,7 @@ linters:
     - govet
     - unused
     - ineffassign
+    - whitespace # Checks for trailing whitespace and other formatting issues
     # Style and simplicity
     - revive # A fast, configurable, and opinionated linter for Go.
 

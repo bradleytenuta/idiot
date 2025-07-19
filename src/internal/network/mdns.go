@@ -29,7 +29,7 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
 		params := mdns.DefaultParams("_services._dns-sd._udp")
 		params.Timeout = 2 * time.Second
 		params.Entries = mdnsEntries
-		params.DisableIPv6 = true // We get IPv6 from the entry itself if available.
+		params.DisableIPv6 = true                     // We get IPv6 from the entry itself if available.
 		params.Logger = stdlog.New(io.Discard, "", 0) // Suppress mdns library's default logger.
 
 		if iface != nil {
@@ -87,8 +87,8 @@ func processMdnsEntry(entry *mdns.ServiceEntry, discoveredDevices map[string]*mo
 }
 
 func extractModelName(entry *mdns.ServiceEntry) string {
-  // Searches for a model name (e.g., "md=Google Nest Mini")
-  // in the InfoFields of an mDNS entry using an idiomatic prefix check.
+	// Searches for a model name (e.g., "md=Google Nest Mini")
+	// in the InfoFields of an mDNS entry using an idiomatic prefix check.
 	for _, field := range entry.InfoFields {
 		if modelName, found := strings.CutPrefix(field, "md="); found {
 			return modelName

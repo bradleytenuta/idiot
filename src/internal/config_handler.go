@@ -29,7 +29,7 @@ func WriteConfigFile(configFilePath string) error {
 		return err
 	}
 	// The number 0644 represents a standard file permission mode used in Linux & macOS
-	return os.WriteFile(configFilePath, yamlBytes, 0644)
+	return os.WriteFile(configFilePath, yamlBytes, 0o644)
 }
 
 func ReadIotDevices() []model.Device {

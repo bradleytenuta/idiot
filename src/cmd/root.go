@@ -12,13 +12,11 @@ import (
 	"com.bradleytenuta/idiot/internal"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "idiot",
-		Short: "Enables you to identify and manage internet of things (IOT).",
-		Long:  `A GO command line interface, that enables you to identify and manage internet of things (IOT) on your local network.`,
-	}
-)
+var rootCmd = &cobra.Command{
+	Use:   "idiot",
+	Short: "Enables you to identify and manage internet of things (IOT).",
+	Long:  `A GO command line interface, that enables you to identify and manage internet of things (IOT) on your local network.`,
+}
 
 func Execute() error {
 	return rootCmd.Execute()
