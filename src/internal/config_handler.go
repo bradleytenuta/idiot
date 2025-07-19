@@ -38,3 +38,37 @@ func ReadIotDevices() []model.Device {
 	}
 	return iotDevices
 }
+
+func SaveSelectedIotDevice(iotDevice *model.Device) {
+	// Retrieve the current list of devices from the configuration.
+	var configDevices []model.Device
+	if err := viper.UnmarshalKey("selected_devices", &configDevices); err != nil {
+		log.Error().Msgf("Failed to read 'selected_devices' from config: %v", err)
+		return
+	}
+
+	// Check for duplicates using the string representation of the IP address.
+	isDuplicate := false
+	for _, cd := range configDevices {
+		if cd.AddrV4 == iotDevice.AddrV4 {
+			isDuplicate = true
+			break
+		}
+	}
+
+	if isDuplicate {
+		log.Debug().Msgf("Device '%s' is already in the list. No changes made.", iotDevice.AddrV4)
+	} else {
+		// Append the new, serializable device to the list.
+		configDevices = append(configDevices, *iotDevice)
+
+		// Set the updated slice back into viper.
+		viper.Set("selected_devices", configDevices)
+
+		// Write the changes to the configuration file.
+		if err := viper.WriteConfig(); err != nil {
+			log.Error().Msgf("Error writing configuration file: %v", err)
+		}
+		log.Debug().Msgf("Successfully added '%s' to 'selected_devices' in the configuration file.", iotDevice.AddrV4)
+	}
+}

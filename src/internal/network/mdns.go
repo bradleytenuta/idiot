@@ -75,4 +75,9 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
       mu.Unlock()
     }
   }()
+
+  // --- Post-Scan Processing ---
+  // Wait a bit longer to ensure all mDNS responses have been processed.
+  // TODO: A more robust solution would use a context with a timeout for the entire scan operation.
+  time.Sleep(7 * time.Second)
 }

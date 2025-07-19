@@ -10,19 +10,19 @@ import (
 
 // TODO: I see sometimes IPv6 is <nil> and not N/A
 // TODO: Add a heading row like a table.
-func CreateInteractiveSelect(iotDevices map[string]*model.Device, label string) (*model.Device, error) {
+func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device, error) {
 	templates := &promptui.SelectTemplates{
-		Label:    "{{ . }}?",
-		Active:   "▶ {{ .AddrV4 | cyan }}	{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}{{ if .CanConnectSSH }},{{ \"SSH OK\" | green }}{{ end }}",
-		Inactive: "  {{ .AddrV4 | faint }}	{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}{{ if .CanConnectSSH }},{{ \"SSH OK\" | green }}{{ end }}",
-		Selected: "✔ You selected {{ .AddrV4 | blue }} {{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}{{ if .CanConnectSSH }},{{ \"SSH OK\" | green }}{{ end }}",
+		Label:    "{{ . }}",
+		Active:   "▶ {{ .AddrV4 | cyan }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
+		Inactive: "  {{ .AddrV4 | faint }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
+		Selected: "✔ You selected {{ .AddrV4 | blue }} {{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }} {{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
 		Details: `
 --------- Device Details ----------
 {{ "IPv4 Address:" | faint }}	{{ .AddrV4 }}
 {{ "IPv6 Address:" | faint }}	{{ if .AddrV6 }}{{ .AddrV6 }}{{ else }}N/A{{ end }}
 {{ "MAC Address:" | faint }}	{{ if .MAC }}{{ .MAC }}{{ else }}N/A{{ end }}
 {{ "Hostname:" | faint }}	{{ if ne .Hostname "" }}{{ .Hostname | magenta }}{{ else }}N/A{{ end }}
-{{ "SSH Ready:" | faint }}	{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ else }}N/A{{ end }}
+{{ "SSH Ready:" | faint }}	{{ if .CanConnectSSH }}{{ "SSH OK" | green }}{{ else }}N/A{{ end }}
 {{ "Sources:" | faint }}	{{ .Sources }}`,
 	}
 
@@ -37,7 +37,7 @@ func CreateInteractiveSelect(iotDevices map[string]*model.Device, label string) 
 	}
 
 	prompt := promptui.Select{
-		Label:     label,
+		Label:     "    IPv4\t\tSSH\tHostname",
 		Items:     devices,
 		Templates: templates,
 		// Display up to 10 items at once.

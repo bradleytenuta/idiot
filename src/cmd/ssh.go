@@ -61,7 +61,7 @@ func getLoginDetails() (string, string, string, error) {
       deviceMap[device.AddrV4] = device
   }
 
-  selectedDevice, err := ui.CreateInteractiveSelect(deviceMap, "Select an IOT Device to SSH into")
+  selectedDevice, err := ui.CreateInteractiveSelect(deviceMap)
   if err != nil {
     return "", "", "", err
   }

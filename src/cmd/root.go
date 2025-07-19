@@ -1,5 +1,5 @@
 package cmd
-
+// TODO: Reformat all files. Ensure all have 2 spaces.
 import (
 	"os"
 	"path/filepath"
@@ -13,7 +13,7 @@ import (
 var (
 	rootCmd = &cobra.Command{
 		Use:   "idiot",
-		Short: "Enables you to identify and manage internet of things (IOT)",
+		Short: "Enables you to identify and manage internet of things (IOT).",
 		Long: `A GO command line interface, that enables you to identify and manage internet of things (IOT) on your local network.`,
 	}
 )
