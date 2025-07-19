@@ -1,8 +1,9 @@
 package network
 
 import (
-	"fmt"
 	"net"
+	"errors"
+	"github.com/rs/zerolog/log"
 )
 
 // Gets the preferred outbound ip of this machine.
@@ -13,13 +14,15 @@ func getOutboundIP() (net.IP, error) {
 	// Using a public DNS server is a common and reliable choice.
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		return nil, fmt.Errorf("could not dial to determine outbound IP: %w", err)
+		log.Debug().Msgf("could not dial to determine outbound IP: %v", err)
+		return nil, err
 	}
 	defer conn.Close()
 
 	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 	if !ok {
-		return nil, fmt.Errorf("could not assert local address to UDPAddr")
+		log.Debug().Msg("could not assert local address to UDPAddr")
+		return nil, errors.New("")
 	}
 
 	return localAddr.IP, nil
@@ -31,13 +34,15 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 	// First, determine the local IP address the OS uses for outbound traffic.
 	outboundIP, err := getOutboundIP()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get outbound IP: %w", err)
+		log.Debug().Msgf("could not get outbound IP: %v", err)
+		return nil, nil, nil, err
 	}
 
 	// Now, find the interface that owns this IP address.
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error getting interfaces: %w", err)
+		log.Debug().Msgf("error getting interfaces: %v", err)
+		return nil, nil, nil, err
 	}
 
 	var subnetMask net.IPMask
@@ -51,7 +56,7 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 		addrs, err := currentIface.Addrs()
 		if err != nil {
 			// Log the error but continue, as there might be other matching interfaces.
-			fmt.Printf("Warning: could not get addresses for %s: %v\n", currentIface.Name, err)
+			log.Debug().Msgf("Warning: could not get addresses for %s: %v\n", currentIface.Name, err)
 			continue
 		}
 
@@ -82,10 +87,11 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 	}
 
 	if selectedIface == nil {
-		return nil, nil, nil, fmt.Errorf("could not find an interface for outbound IP %s", outboundIP.String())
+		log.Debug().Msgf("could not find an interface for outbound IP %s", outboundIP.String())
+		return nil, nil, nil, errors.New("")
 	}
 
-	fmt.Printf("Found Local IP: %s/%s on interface: %s\n", outboundIP.String(), net.IP(subnetMask).String(), selectedIface.Name)
+	log.Debug().Msgf("Found Local IP: %s/%s on interface: %s\n", outboundIP.String(), net.IP(subnetMask).String(), selectedIface.Name)
 
 	// --- Subnet Calculation ---
   	// Calculate the network address by applying the subnet mask to the local IP.
@@ -105,8 +111,8 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 		// and the host bits (which were 0s in the subnet mask) become 1s. This essentially gives you the "wildcard" or "host part" of the subnet mask.
 		broadcastAddr[i] = networkAddr[i] | ^subnetMask[i]
 	}
-	fmt.Printf("Network Address: %s\n", networkAddr.String())
-	fmt.Printf("Broadcast Address: %s\n", broadcastAddr.String())
+	log.Debug().Msgf("Network Address: %s\n", networkAddr.String())
+	log.Debug().Msgf("Broadcast Address: %s\n", broadcastAddr.String())
 
 	return networkAddr, broadcastAddr, selectedIface, nil
 }

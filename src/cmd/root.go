@@ -1,12 +1,12 @@
 package cmd
-// TODO: Reformat all files. Ensure all have 2 spaces.
+
 import (
 	"os"
 	"path/filepath"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/rs/zerolog"
-    "github.com/rs/zerolog/log"
+  "github.com/rs/zerolog/log"
 	"com.bradleytenuta/idiot/internal"
 )
 
@@ -49,7 +49,7 @@ func initConfig() {
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
     if viper.GetBool("debug") {
-        zerolog.SetGlobalLevel(zerolog.DebugLevel)
+      zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		log.Debug().Msg("Debug logs are turned on!")
     }
 }

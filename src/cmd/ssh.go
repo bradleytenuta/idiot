@@ -27,7 +27,9 @@ func runSsh(cmd *cobra.Command, args []string) {
   // We are calling a function that returns another function, and then deferring the execution of the returned function.
   // This uses the function returned by initTerminal  schedules it to be executed right before the surrounding function exits.
   defer ui.InitTerminal()()
-  addr, user, password, err := getLoginDetails()
+  savedDevices := internal.ReadIotDevices()
+  cmd.Println("Select an IOT device to SSH into:")
+  addr, user, password, err := getLoginDetails(savedDevices)
   if err != nil {
     return
   }
@@ -46,9 +48,7 @@ func runSsh(cmd *cobra.Command, args []string) {
   handleInteractiveSession(session)
 }
 
-func getLoginDetails() (string, string, string, error) {
-  savedDevices := internal.ReadIotDevices()
-
+func getLoginDetails(savedDevices []model.Device) (string, string, string, error) {
   // TODO: Could we replace the map with a slice?
   // We will create a map where the key is the device's Name.
   deviceMap := make(map[string]*model.Device)

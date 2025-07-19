@@ -9,14 +9,14 @@ import (
 )
 
 // TODO: I see sometimes IPv6 is <nil> and not N/A
-// TODO: Add a heading row like a table.
 func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
-		Active:   "▶ {{ .AddrV4 | cyan }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
+		Active:   "> {{ .AddrV4 | cyan }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
 		Inactive: "  {{ .AddrV4 | faint }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
-		Selected: "✔ You selected {{ .AddrV4 | blue }} {{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }} {{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
+		Selected: "> You selected {{ .AddrV4 | blue }} {{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }} {{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
 		Details: `
+Total IOT Devices found: {{ .Total }}
 --------- Device Details ----------
 {{ "IPv4 Address:" | faint }}	{{ .AddrV4 }}
 {{ "IPv6 Address:" | faint }}	{{ if .AddrV6 }}{{ .AddrV6 }}{{ else }}N/A{{ end }}
@@ -26,21 +26,21 @@ func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device
 {{ "Sources:" | faint }}	{{ .Sources }}`,
 	}
 
-	// Convert the map of discovered devices into a slice for the prompt.
-	devices := make([]*model.Device, 0, len(iotDevices))
-	for _, dev := range iotDevices {
-		devices = append(devices, dev)
+	totalDevices := len(iotDevices)
+	if totalDevices == 0 {
+		return nil, errors.New("no IOT devices to select")
 	}
 
-	if len(devices) == 0 {
-		return nil, errors.New("no IOT devices to select")
+	// Convert the map of discovered devices into a slice of our wrapper struct.
+	selectItems := make([]model.SelectItem, 0, totalDevices)
+	for _, dev := range iotDevices {
+		selectItems = append(selectItems, model.SelectItem{Device: dev, Total: totalDevices})
 	}
 
 	prompt := promptui.Select{
 		Label:     "    IPv4\t\tSSH\tHostname",
-		Items:     devices,
+		Items:     selectItems,
 		Templates: templates,
-		// Display up to 10 items at once.
 		Size: 10,
 	}
 
@@ -48,14 +48,13 @@ func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device
 	if err != nil {
 		// Handle user interruption (e.g., Ctrl+C).
 		if err == promptui.ErrInterrupt {
-			// TODO: Maybe should be using fmt to pass error message upstream?
-			log.Error().Msg("Selection cancelled by user")
+			log.Debug().Msg("Selection cancelled by user")
 			return nil, err
 		}
 		log.Error().Msgf("Prompt failed %v", err)
 		return nil, err
 	}
-	return devices[i], nil
+	return selectItems[i].Device, nil
 }
 
 func GetPromptInput(label string, mask rune) (string, error) {

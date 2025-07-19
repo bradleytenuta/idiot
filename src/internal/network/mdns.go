@@ -1,13 +1,15 @@
 package network
 
 import (
-  "fmt"
-  "net"
-  "strings"
-  "time"
-  "sync"
-  "github.com/hashicorp/mdns"
-  "com.bradleytenuta/idiot/internal/model"
+  "io"
+	stdlog "log"
+	"net"
+	"strings"
+	"sync"
+	"time"
+	"com.bradleytenuta/idiot/internal/model"
+	"github.com/hashicorp/mdns"
+	"github.com/rs/zerolog/log"
 )
 
 // Starts the mDNS discovery process.
@@ -16,14 +18,20 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
   // This goroutine will discover devices on the network that advertise services via multicast DNS.
   // A buffered channel is used to receive service entries from the mDNS query.
   mdnsEntries := make(chan *mdns.ServiceEntry, 100) // Buffer the channel
+  var wg sync.WaitGroup
+
+  wg.Add(1)
   go func() {
+    defer wg.Done()
     // Ensure the channel is closed when the goroutine finishes to signal completion.
     defer close(mdnsEntries)
     // Set up mDNS query parameters. We search for the special "_services._dns-sd._udp" name to discover all available services.
     params := mdns.DefaultParams("_services._dns-sd._udp")
-    params.Timeout = 5 * time.Second
+    params.Timeout = 2 * time.Second
     params.Entries = mdnsEntries
     params.DisableIPv6 = true
+    // Suppress the default logger of the mdns library by providing one that discards output.
+    params.Logger = stdlog.New(io.Discard, "", 0)
     // If a specific network interface was found, bind the mDNS query to it.
     if iface != nil {
       params.Interface = iface
@@ -31,12 +39,14 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
     // Execute the mDNS query.
     err := mdns.Query(params)
     if err != nil {
-      fmt.Printf("mDNS query error: %v\n", err)
+      log.Debug().Msgf("mDNS query error: %v\n", err)
     }
   }()
 
+  wg.Add(1)
   // This goroutine processes the results from the mDNS discovery channel.
   go func() {
+    defer wg.Done()
     // Range over the channel until it's closed by the sender goroutine.
     for entry := range mdnsEntries {
       // Lock the mutex to safely access the shared map.
@@ -71,13 +81,8 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
 
       discoveredDevices[ipStr].AddSource("mDNS")
 
-      // Unlock the mutex after modification.
       mu.Unlock()
     }
   }()
-
-  // --- Post-Scan Processing ---
-  // Wait a bit longer to ensure all mDNS responses have been processed.
-  // TODO: A more robust solution would use a context with a timeout for the entire scan operation.
-  time.Sleep(7 * time.Second)
+  wg.Wait()
 }
