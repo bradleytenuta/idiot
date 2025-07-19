@@ -90,13 +90,3 @@ func runScan(cmd *cobra.Command, args []string) {
 		log.Debug().Msg("No device selected. Configuration not updated.")
 	}
 }
-
-// Important note on ARP cache:
-// After a successful ping, the device's MAC address should be in your system's ARP cache.
-// Retrieving this from Go directly is OS-dependent and often involves:
-// - Parsing `arp -a` output (less ideal for programmatic use)
-// - Using a CGO binding to low-level network functions
-// - Reading `/proc/net/arp` on Linux systems.
-// The Go standard library does not provide a direct way to query the ARP cache.
-// For a production-grade network scanner, you'd likely integrate with a library
-// that wraps these OS-specific calls or use CGO.

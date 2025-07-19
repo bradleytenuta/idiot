@@ -14,77 +14,85 @@ import (
 	"com.bradleytenuta/idiot/internal/model"
 )
 
-// Starts the mDNS discovery process.
-// It runs in the background, populating the shared discoveredDevices map with services it finds.
 func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
-	// This goroutine will discover devices on the network that advertise services via multicast DNS.
 	// A buffered channel is used to receive service entries from the mDNS query.
-	mdnsEntries := make(chan *mdns.ServiceEntry, 100) // Buffer the channel
+	mdnsEntries := make(chan *mdns.ServiceEntry, 100)
 	var wg sync.WaitGroup
 
+	// Goroutine to query for mDNS services.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// Ensure the channel is closed when the goroutine finishes to signal completion.
 		defer close(mdnsEntries)
+
 		// Set up mDNS query parameters. We search for the special "_services._dns-sd._udp" name to discover all available services.
 		params := mdns.DefaultParams("_services._dns-sd._udp")
 		params.Timeout = 2 * time.Second
 		params.Entries = mdnsEntries
-		params.DisableIPv6 = true
-		// Suppress the default logger of the mdns library by providing one that discards output.
-		params.Logger = stdlog.New(io.Discard, "", 0)
-		// If a specific network interface was found, bind the mDNS query to it.
+		params.DisableIPv6 = true // We get IPv6 from the entry itself if available.
+		params.Logger = stdlog.New(io.Discard, "", 0) // Suppress mdns library's default logger.
+
 		if iface != nil {
 			params.Interface = iface
 		}
-		// Execute the mDNS query.
-		err := mdns.Query(params)
-		if err != nil {
-			log.Debug().Msgf("mDNS query error: %v\n", err)
+
+		if err := mdns.Query(params); err != nil {
+			log.Debug().Msgf("mDNS query error: %v", err)
 		}
 	}()
 
+	// Goroutine to process the mDNS entries as they are discovered.
 	wg.Add(1)
-	// This goroutine processes the results from the mDNS discovery channel.
 	go func() {
 		defer wg.Done()
-		// Range over the channel until it's closed by the sender goroutine.
 		for entry := range mdnsEntries {
-			// Lock the mutex to safely access the shared map.
-			mu.Lock()
-			ipStr := entry.AddrV4.String()
-
-			// Extract model name from mDNS entry info fields to get a user-friendly name.
-			var modelName string
-			for _, field := range entry.InfoFields {
-
-				if strings.HasPrefix(field, "md=") {
-					// As an example, split: "md=Google Nest Mini" into ["md", "Google Nest Mini"]
-					parts := strings.SplitN(field, "=", 2)
-					if len(parts) == 2 {
-						modelName = parts[1]
-						break // Found the model name, no need to check other fields.
-					}
-				}
-			}
-
-			// If the device hasn't been seen before, create a new entry in the map.
-			if _, exists := discoveredDevices[ipStr]; !exists {
-				discoveredDevices[ipStr] = &model.Device{AddrV4: entry.AddrV4.String(), AddrV6: entry.AddrV6IPAddr.String(), Hostname: modelName}
-			} else {
-				if discoveredDevices[ipStr].Hostname == "" {
-					discoveredDevices[ipStr].Hostname = modelName
-				}
-				if discoveredDevices[ipStr].AddrV6 == "" {
-					discoveredDevices[ipStr].AddrV6 = entry.AddrV6IPAddr.String()
-				}
-			}
-
-			discoveredDevices[ipStr].AddSource("mDNS")
-
-			mu.Unlock()
+			processMdnsEntry(entry, discoveredDevices, mu)
 		}
 	}()
+
 	wg.Wait()
+}
+
+func processMdnsEntry(entry *mdns.ServiceEntry, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
+	if entry.AddrV4 == nil {
+		return
+	}
+
+	ipStr := entry.AddrV4.String()
+	modelName := extractModelName(entry)
+	var addrV6Str string
+	if entry.AddrV6 != nil {
+		addrV6Str = entry.AddrV6.String()
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Get or create the device entry.
+	device, exists := discoveredDevices[ipStr]
+	if !exists {
+		device = &model.Device{AddrV4: ipStr}
+		discoveredDevices[ipStr] = device
+	}
+
+	// Update fields only if they are currently empty to avoid overwriting data from other sources.
+	if device.Hostname == "" && modelName != "" {
+		device.Hostname = modelName
+	}
+	if device.AddrV6 == "" && addrV6Str != "" {
+		device.AddrV6 = addrV6Str
+	}
+
+	device.AddSource("mDNS")
+}
+
+func extractModelName(entry *mdns.ServiceEntry) string {
+  // Searches for a model name (e.g., "md=Google Nest Mini")
+  // in the InfoFields of an mDNS entry using an idiomatic prefix check.
+	for _, field := range entry.InfoFields {
+		if modelName, found := strings.CutPrefix(field, "md="); found {
+			return modelName
+		}
+	}
+	return ""
 }

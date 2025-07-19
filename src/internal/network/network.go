@@ -2,10 +2,43 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/rs/zerolog/log"
 )
+
+// GetInternetFacingNetworkInfo automatically discovers the network interface used for
+// internet connectivity and returns its network information.
+func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
+	// First, determine the local IP address the OS uses for outbound traffic.
+	outboundIP, err := getOutboundIP()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not get outbound IP: %w", err)
+	}
+
+	// Find the interface and IP network configuration for our outbound IP.
+	selectedIface, ipNet, err := findInterfaceForIP(outboundIP)
+	if err != nil {
+		log.Debug().Msgf("could not find interface for outbound IP %s: %v", outboundIP, err)
+		return nil, nil, nil, fmt.Errorf("could not find interface for outbound IP %s: %w", outboundIP, err)
+	}
+
+	subnetMask := ipNet.Mask
+	log.Debug().Msgf("Found Local IP: %s/%s on interface: %s", outboundIP.String(), net.IP(subnetMask).String(), selectedIface.Name)
+
+	// Calculate the network address by applying the subnet mask to the local IP.
+	networkAddr := outboundIP.Mask(subnetMask)
+	// Calculate broadcast by ORing the network address with the inverted subnet mask.
+	broadcastAddr := make(net.IP, len(outboundIP))
+	for i := 0; i < len(outboundIP); i++ {
+		broadcastAddr[i] = networkAddr[i] | ^subnetMask[i]
+	}
+	log.Debug().Msgf("Network Address: %s", networkAddr.String())
+	log.Debug().Msgf("Broadcast Address: %s", broadcastAddr.String())
+
+	return networkAddr, broadcastAddr, selectedIface, nil
+}
 
 // Gets the preferred outbound ip of this machine.
 // It works by dialing a connection to a public DNS server (without sending any data)
@@ -23,97 +56,36 @@ func getOutboundIP() (net.IP, error) {
 	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 	if !ok {
 		log.Debug().Msg("could not assert local address to UDPAddr")
-		return nil, errors.New("")
+		return nil, errors.New("could not assert local address to *net.UDPAddr")
 	}
 
 	return localAddr.IP, nil
 }
 
-// GetInternetFacingNetworkInfo automatically discovers the network interface used for
-// internet connectivity and returns its network information.
-func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
-	// First, determine the local IP address the OS uses for outbound traffic.
-	outboundIP, err := getOutboundIP()
-	if err != nil {
-		log.Debug().Msgf("could not get outbound IP: %v", err)
-		return nil, nil, nil, err
-	}
-
-	// Now, find the interface that owns this IP address.
+// findInterfaceForIP iterates through system network interfaces to find the one
+// associated with the given IP address, returning the interface and its IP network configuration.
+func findInterfaceForIP(ip net.IP) (*net.Interface, *net.IPNet, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Debug().Msgf("error getting interfaces: %v", err)
-		return nil, nil, nil, err
+		return nil, nil, fmt.Errorf("cannot get network interfaces: %w", err)
 	}
 
-	var subnetMask net.IPMask
-	var selectedIface *net.Interface // Pointer to the interface found
-
-	// Iterate over all found network interfaces by index to safely get a pointer.
 	for i := range ifaces {
-		// Use a local variable for the current interface for readability.
-		currentIface := ifaces[i]
-		// Get all addresses associated with the current interface.
-		addrs, err := currentIface.Addrs()
+		iface := &ifaces[i]
+		addrs, err := iface.Addrs()
 		if err != nil {
-			// Log the error but continue, as there might be other matching interfaces.
-			log.Debug().Msgf("Warning: could not get addresses for %s: %v\n", currentIface.Name, err)
+			log.Debug().Msgf("Cannot get addresses for interface %s: %v", iface.Name, err)
 			continue
 		}
 
-		// Iterate over the addresses of the interface.
 		for _, addr := range addrs {
-			var ip net.IP
-			// Check if the address is an IP network and not a loopback address.
-			if ipNet, ok := addr.(*net.IPNet); ok {
-				ip = ipNet.IP
-			}
-
-			// Check if the IP from the interface matches our outbound IP.
-			if ip != nil && ip.Equal(outboundIP) {
-				// We are interested in IPv4 addresses for this scan.
-				if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.To4() != nil {
-					// Store the IPv4 address, subnet mask, and a pointer to the interface.
-					// Even if IPv4 (length == 4), Go will store this in an IPv6 format with length == 16.
-					// This the local IP address of the current device.
-					subnetMask = ipNet.Mask
-					selectedIface = &ifaces[i] // Safely get the address of the slice element.
-					break                      // Exit the address loop once a suitable IPv4 address is found.
-				}
+			// Check if the address is an IPNet and if its IP matches the one we're looking for.
+			if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.Equal(ip) {
+				// We found the correct interface and IP network.
+				return iface, ipNet, nil
 			}
 		}
-		if selectedIface != nil {
-			break
-		}
 	}
 
-	if selectedIface == nil {
-		log.Debug().Msgf("could not find an interface for outbound IP %s", outboundIP.String())
-		return nil, nil, nil, errors.New("")
-	}
-
-	log.Debug().Msgf("Found Local IP: %s/%s on interface: %s\n", outboundIP.String(), net.IP(subnetMask).String(), selectedIface.Name)
-
-	// --- Subnet Calculation ---
-	// Calculate the network address by applying the subnet mask to the local IP.
-	networkAddr := outboundIP.Mask(subnetMask)
-	// Prepare a slice to hold the broadcast address.
-	broadcastAddr := make(net.IP, len(outboundIP))
-	for i := 0; i < len(outboundIP); i++ {
-		// networkAddr[i] | ... (Bitwise OR)
-		// This takes the current byte of the networkAddr and performs a bitwise OR operation with the result of ^subnetMask[i].
-		// When you OR the networkAddr byte with the ^subnetMask[i] byte:
-		// For the network bits (where networkAddr[i] has the network portion and ^subnetMask[i] has 0s), the OR operation will preserve the networkAddr bits.
-		// For the host bits (where networkAddr[i] has 0s and ^subnetMask[i] has 1s), the OR operation will set all these bits to 1.
-		//
-		// ^subnetMask[i] - (Bitwise NOT/Complement)
-		// This takes the current byte of the subnetMask and flips all its bits. For example, if a byte of subnetMask is 255 (binary 11111111), ^255 would be 0 (binary 00000000).
-		// The effect of ^subnetMask[i] is to create a byte where the network bits (which were 1s in the subnet mask) become 0s,
-		// and the host bits (which were 0s in the subnet mask) become 1s. This essentially gives you the "wildcard" or "host part" of the subnet mask.
-		broadcastAddr[i] = networkAddr[i] | ^subnetMask[i]
-	}
-	log.Debug().Msgf("Network Address: %s\n", networkAddr.String())
-	log.Debug().Msgf("Broadcast Address: %s\n", broadcastAddr.String())
-
-	return networkAddr, broadcastAddr, selectedIface, nil
+	return nil, nil, fmt.Errorf("no interface found for IP %s", ip)
 }

@@ -1,119 +1,148 @@
 package network
 
 import (
+	"context"
+	"encoding/binary"
 	"net"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 
 	"com.bradleytenuta/idiot/internal/model"
 )
 
-// Scans the local network using ICMP echo requests (pings) to discover hosts.
-// It iterates through the IP range defined by the network and broadcast addresses.
-// For each responsive host, it adds or updates an entry in the shared discoveredDevices map.
+// PerformIcmpScan discovers hosts on the local network by sending ICMP echo requests.
+// It uses a single listener and concurrent routines for sending pings and reading replies,
+// which is significantly more performant than creating a listener for each ping.
 func PerformIcmpScan(networkAddr, broadcastAddr net.IP, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
-	// A WaitGroup is used to wait for all the concurrent ping operations to complete.
-	var wg sync.WaitGroup
-	// TODO: replace with viper.Get("subnet_size")
-	ipRangeStart := int(networkAddr[3]) // Assuming /24 for simplicity, adjust for larger subnets. TODO: Be flexible based on what subnet is in property file.
-	ipRangeEnd := int(broadcastAddr[3])
-
-	// For subnets larger than /24, you'd need to iterate through the network part too.
-	// For example, for a /16:
-	// startIPBytes := networkAddr.To4()
-	// endIPBytes := broadcastAddr.To4()
-	// for i := startIPBytes[0]; i <= endIPBytes[0]; i++ {
-	//    for j := startIPBytes[1]; j <= endIPBytes[1]; j++ {
-	//        // ... and so on
-	//    }
-	// }
-
-	// Loop through the host portion of the IP range, skipping the network and broadcast addresses.
-	for i := ipRangeStart + 1; i < ipRangeEnd; i++ {
-		targetIP := make(net.IP, 4)
-		copy(targetIP, networkAddr)
-		targetIP[3] = byte(i) // Only works for /24 and smaller ranges within the last octet
-
-		// Increment the WaitGroup counter for each new goroutine.
-		wg.Add(1)
-		// Launch a goroutine to ping the target IP address concurrently.
-		go func(ip net.IP) {
-			// Decrement the WaitGroup counter when the goroutine completes.
-			defer wg.Done()
-			// Listen for ICMP packets on all available IPv4 interfaces.
-			conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-			if err != nil {
-				// Silently return on error to avoid cluttering output.
-				return
-			}
-			defer conn.Close()
-
-			// Construct an ICMP Echo Request (ping) message.
-			wm := icmp.Message{
-				Type: ipv4.ICMPTypeEcho, Code: 0,
-				Body: &icmp.Echo{
-					ID:   os.Getpid() & 0xffff, // Use the process ID to uniquely identify this pinger.
-					Seq:  1,                    // Sequence number.
-					Data: []byte("HELLO-R-U-THERE"),
-				},
-			}
-
-			// Marshal the message into its binary wire format.
-			wb, err := wm.Marshal(nil)
-			if err != nil {
-				return
-			}
-
-			// Send the ICMP packet to the target IP address.
-			_, err = conn.WriteTo(wb, &net.IPAddr{IP: ip})
-			if err != nil {
-				// Silently return on send error.
-				return
-			}
-
-			// Set a deadline for reading a reply to avoid waiting indefinitely.
-			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-			// Prepare a buffer to receive the reply.
-			rb := make([]byte, 1500)
-			// Read from the connection to get the ICMP reply.
-			n, _, err := conn.ReadFrom(rb)
-			if err != nil {
-				// A read error (like a timeout) means no reply was received. This is expected for hosts that are down.
-				return
-			}
-
-			// Parse the received binary data back into an ICMP message.
-			rm, err := icmp.ParseMessage(1, rb[:n])
-			if err != nil {
-				return
-			}
-
-			// Check if the message is an Echo Reply, indicating a successful ping.
-			if rm.Type == ipv4.ICMPTypeEchoReply {
-				// Lock the mutex to safely update the shared map.
-				mu.Lock()
-				ipStr := ip.String()
-				// If the device is new, add it to the map
-				// TODO: Is there any more info we can extract from the ICMP reply?
-				if _, exists := discoveredDevices[ipStr]; !exists {
-					discoveredDevices[ipStr] = &model.Device{AddrV4: ip.String()}
-				}
-				discoveredDevices[ipStr].AddSource("ICMP")
-
-				// Unlock the mutex.
-				mu.Unlock()
-
-				// To get MAC address, you'd typically look at the ARP cache AFTER a ping
-				// or use platform-specific libraries. Go's net package doesn't directly expose ARP.
-				// For Linux, you might read /proc/net/arp. For Windows, `arp -a`.
-				// This part is complex and often requires CGO or external commands.
-			}
-		}(targetIP)
+	// Listen for ICMP packets on all available IPv4 interfaces.
+	// We create one listener for the entire scan duration for efficiency.
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		log.Error().Msgf("Failed to listen for ICMP packets: %v", err)
+		return
 	}
-	// Block execution until all ping goroutines have completed.
+	defer conn.Close()
+
+	// Use a context to manage the scan's lifecycle, ensuring it stops after a timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+
+	// Start a dedicated goroutine to read all incoming ICMP replies.
+	wg.Add(1)
+	go readReplies(ctx, conn, discoveredDevices, mu, &wg)
+
+	// Start a dedicated goroutine to send out all the pings.
+	wg.Add(1)
+	go sendPings(conn, networkAddr, broadcastAddr, &wg)
+
+	// Wait for both the sender and reader goroutines to complete.
 	wg.Wait()
+}
+
+// readReplies runs in a dedicated goroutine, listening for ICMP echo replies
+// until the context is cancelled.
+func readReplies(ctx context.Context, conn *icmp.PacketConn, discoveredDevices map[string]*model.Device, mu *sync.Mutex, wg *sync.WaitGroup) {
+	defer wg.Done()
+	replyBuf := make([]byte, 1500)
+
+	for {
+		select {
+		case <-ctx.Done(): // The scan timeout has been reached.
+			return
+		default:
+			// Set a short deadline to make the ReadFrom call non-blocking,
+			// allowing the loop to check the context cancellation status.
+			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			n, addr, err := conn.ReadFrom(replyBuf)
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue // Expected timeout, continue loop to check context.
+				}
+				log.Debug().Msgf("ICMP read error: %v", err)
+				return // Other errors are fatal for the reader.
+			}
+
+			// Parse the reply and update the device map if it's a valid echo reply.
+			msg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), replyBuf[:n])
+			if err != nil {
+				continue
+			}
+
+			if msg.Type == ipv4.ICMPTypeEchoReply {
+				if ipAddr, ok := addr.(*net.IPAddr); ok {
+					updateDiscoveredDevice(ipAddr.IP, discoveredDevices, mu)
+				}
+			}
+		}
+	}
+}
+
+// sendPings generates all IPs in the subnet and sends an ICMP echo request to each.
+func sendPings(conn *icmp.PacketConn, networkAddr, broadcastAddr net.IP, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// Construct the ICMP Echo Request message once.
+	msg := icmp.Message{
+		Type: ipv4.ICMPTypeEcho, Code: 0,
+		Body: &icmp.Echo{
+			ID:   os.Getpid() & 0xffff, // Use process ID to uniquely identify this pinger.
+			Seq:  1,
+			Data: []byte("IDIOT-SCAN"),
+		},
+	}
+	msgBytes, err := msg.Marshal(nil)
+	if err != nil {
+		log.Error().Msgf("Failed to marshal ICMP message: %v", err)
+		return
+	}
+
+	// Iterate through all valid host IPs in the subnet and send a ping.
+	for _, ip := range generateIPs(networkAddr, broadcastAddr) {
+		conn.WriteTo(msgBytes, &net.IPAddr{IP: ip})
+		time.Sleep(1 * time.Millisecond) // Small delay to avoid flooding the network.
+	}
+}
+
+// updateDiscoveredDevice safely adds or updates a device in the shared map.
+func updateDiscoveredDevice(ip net.IP, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	ipStr := ip.String()
+	if _, exists := discoveredDevices[ipStr]; !exists {
+		discoveredDevices[ipStr] = &model.Device{AddrV4: ipStr}
+	}
+	discoveredDevices[ipStr].AddSource("ICMP")
+}
+
+// generateIPs creates a slice of all valid host IP addresses within a given
+// network range, excluding the network and broadcast addresses.
+// This is done by converting IPs to integers for robust iteration.
+func generateIPs(networkAddr, broadcastAddr net.IP) []net.IP {
+	// Ensure we are working with 4-byte IPv4 addresses.
+	network := networkAddr.To4()
+	broadcast := broadcastAddr.To4()
+	if network == nil || broadcast == nil {
+		return nil
+	}
+
+	// Convert IPs to uint32 for easy iteration.
+	start := binary.BigEndian.Uint32(network)
+	end := binary.BigEndian.Uint32(broadcast)
+
+	var ips []net.IP
+	// Iterate from the first host IP to the last host IP.
+	for i := start + 1; i < end; i++ {
+		ip := make(net.IP, 4)
+		binary.BigEndian.PutUint32(ip, i)
+		ips = append(ips, ip)
+	}
+	return ips
 }

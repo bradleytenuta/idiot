@@ -9,7 +9,6 @@ import (
 	"com.bradleytenuta/idiot/internal/model"
 )
 
-// TODO: I see sometimes IPv6 is <nil> and not N/A
 func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
