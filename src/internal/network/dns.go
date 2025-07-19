@@ -6,7 +6,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-  "github.com/rs/zerolog/log"
+
+	"github.com/rs/zerolog/log"
+
 	"com.bradleytenuta/idiot/internal/model"
 )
 
@@ -33,7 +35,7 @@ func lookupHostname(ipStr string) string {
 
 // Enriches device data with hostnames found via reverse DNS lookups.
 func PerformReverseDnsLookUp(discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
-  var wg sync.WaitGroup
+	var wg sync.WaitGroup
 	for _, device := range discoveredDevices {
 		wg.Add(1)
 		go func(deviceToProcess *model.Device) {

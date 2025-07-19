@@ -4,8 +4,9 @@ package ui
 
 import (
 	"os"
-	"golang.org/x/sys/windows"
+
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sys/windows"
 )
 
 // This function is built for windows applications only
@@ -34,8 +35,8 @@ func InitTerminal() (cleanup func()) {
 		return
 	}
 
-	// If successful, it returns a cleanup function. The calling code is expected to execute this function 
-	// when it's finished (typically using defer). This cleanup function restores the console back to its originalMode, 
+	// If successful, it returns a cleanup function. The calling code is expected to execute this function
+	// when it's finished (typically using defer). This cleanup function restores the console back to its originalMode,
 	// ensuring the application doesn't permanently alter the user's terminal settings after it exits.
 	cleanup = func() {
 		_ = windows.SetConsoleMode(stdout, originalMode)

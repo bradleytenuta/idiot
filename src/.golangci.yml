@@ -1,0 +1,38 @@
+# See https://golangci-lint.run/usage/configuration/ for all options
+
+run:
+  # Timeout for analysis, e.g. 30s, 5m. Default is 1m.
+  timeout: 5m
+  # Exit code when issues are found. Default is 1.
+  issues-exit-code: 1
+  # Include test files. Default is true.
+  tests: true
+
+linters:
+  # We use an allow-list approach, enabling only the linters we want.
+  disable-all: true
+  enable:
+    # Formatting and imports
+    - gofmt
+    - goimports
+    # Best practice and bug prevention
+    - errcheck
+    - staticcheck
+    - govet
+    - unused
+    - ineffassign
+    # Style and simplicity
+    - revive # A fast, configurable, and opinionated linter for Go.
+
+linters-settings:
+  goimports:
+    # Define your local module path to group imports correctly.
+    local-prefixes: com.bradleytenuta/idiot
+
+issues:
+  # You can exclude specific issues if needed.
+  # For example, to ignore a known issue in a specific file:
+  # exclude-rules:
+  #   - path: _test\.go
+  #     linters:
+  #       - goconst

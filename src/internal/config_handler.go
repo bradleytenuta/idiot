@@ -2,9 +2,11 @@ package internal
 
 import (
 	"os"
-	"gopkg.in/yaml.v3"
+
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
-  "github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
+
 	"com.bradleytenuta/idiot/internal/model"
 )
 
@@ -33,7 +35,7 @@ func WriteConfigFile(configFilePath string) error {
 func ReadIotDevices() []model.Device {
 	var iotDevices []model.Device
 	if err := viper.UnmarshalKey("selected_devices", &iotDevices); err != nil {
-    log.Error().Msgf("Error reading IOT Devices from the configuration file: %v", err)
+		log.Error().Msgf("Error reading IOT Devices from the configuration file: %v", err)
 		return []model.Device{}
 	}
 	return iotDevices

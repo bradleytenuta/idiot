@@ -1,8 +1,9 @@
 package network
 
 import (
-	"net"
 	"errors"
+	"net"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -77,7 +78,7 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 					// This the local IP address of the current device.
 					subnetMask = ipNet.Mask
 					selectedIface = &ifaces[i] // Safely get the address of the slice element.
-					break // Exit the address loop once a suitable IPv4 address is found.
+					break                      // Exit the address loop once a suitable IPv4 address is found.
 				}
 			}
 		}
@@ -94,7 +95,7 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 	log.Debug().Msgf("Found Local IP: %s/%s on interface: %s\n", outboundIP.String(), net.IP(subnetMask).String(), selectedIface.Name)
 
 	// --- Subnet Calculation ---
-  	// Calculate the network address by applying the subnet mask to the local IP.
+	// Calculate the network address by applying the subnet mask to the local IP.
 	networkAddr := outboundIP.Mask(subnetMask)
 	// Prepare a slice to hold the broadcast address.
 	broadcastAddr := make(net.IP, len(outboundIP))
@@ -107,7 +108,7 @@ func GetInternetFacingNetworkInfo() (net.IP, net.IP, *net.Interface, error) {
 		//
 		// ^subnetMask[i] - (Bitwise NOT/Complement)
 		// This takes the current byte of the subnetMask and flips all its bits. For example, if a byte of subnetMask is 255 (binary 11111111), ^255 would be 0 (binary 00000000).
-		// The effect of ^subnetMask[i] is to create a byte where the network bits (which were 1s in the subnet mask) become 0s, 
+		// The effect of ^subnetMask[i] is to create a byte where the network bits (which were 1s in the subnet mask) become 0s,
 		// and the host bits (which were 0s in the subnet mask) become 1s. This essentially gives you the "wildcard" or "host part" of the subnet mask.
 		broadcastAddr[i] = networkAddr[i] | ^subnetMask[i]
 	}

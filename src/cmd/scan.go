@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"sync"
-  "time"
-  "com.bradleytenuta/idiot/internal"
+	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
+	"com.bradleytenuta/idiot/internal"
 	"com.bradleytenuta/idiot/internal/model"
 	"com.bradleytenuta/idiot/internal/network"
 	"com.bradleytenuta/idiot/internal/ui"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -29,10 +31,10 @@ func runScan(cmd *cobra.Command, args []string) {
 		return
 	}
 
-  var mu sync.Mutex
+	var mu sync.Mutex
 	discoveredDevices := make(map[string]*model.Device)
 
-  // Goroutine to display a spinner while scanning.
+	// Goroutine to display a spinner while scanning.
 	done := make(chan bool)
 	go func() {
 		spinner := []string{"-", "\\", "|", "/"}
@@ -50,9 +52,9 @@ func runScan(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-  var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-  // Phase 1: Discover devices on the network.
+	// Phase 1: Discover devices on the network.
 	// These can run concurrently.
 	wg.Add(2)
 	go func() {
@@ -80,7 +82,7 @@ func runScan(cmd *cobra.Command, args []string) {
 
 	close(done) // Stop the spinner.
 
-  cmd.Println("\nSelect an IOT device to save for later use:")
+	cmd.Println("\nSelect an IOT device to save for later use:")
 	selectedIotDevice, _ := ui.CreateInteractiveSelect(discoveredDevices)
 	if selectedIotDevice != nil {
 		internal.SaveSelectedIotDevice(selectedIotDevice)
@@ -88,6 +90,7 @@ func runScan(cmd *cobra.Command, args []string) {
 		log.Debug().Msg("No device selected. Configuration not updated.")
 	}
 }
+
 // Important note on ARP cache:
 // After a successful ping, the device's MAC address should be in your system's ARP cache.
 // Retrieving this from Go directly is OS-dependent and often involves:

@@ -3,9 +3,10 @@ package ui
 import (
 	"errors"
 
-	"com.bradleytenuta/idiot/internal/model"
 	"github.com/manifoldco/promptui"
 	"github.com/rs/zerolog/log"
+
+	"com.bradleytenuta/idiot/internal/model"
 )
 
 // TODO: I see sometimes IPv6 is <nil> and not N/A
@@ -41,7 +42,7 @@ Total IOT Devices found: {{ .Total }}
 		Label:     "    IPv4\t\tSSH\tHostname",
 		Items:     selectItems,
 		Templates: templates,
-		Size: 10,
+		Size:      10,
 	}
 
 	i, _, err := prompt.Run()
