@@ -63,7 +63,7 @@ Total IOT Devices found: {{ .Total }}
 // It can optionally mask the input, which is useful for passwords.
 func GetPromptInput(label string, mask rune) (string, error) {
 	prompt := promptui.Prompt{
-		Label: label,
+		Label:       label,
 		HideEntered: true,
 	}
 	if mask != 0 {

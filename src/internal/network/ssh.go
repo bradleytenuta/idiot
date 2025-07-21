@@ -55,8 +55,8 @@ func GetHostKeyCallback() (ssh.HostKeyCallback, error) {
 	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
 
 	// knownhosts.New will create the file if it doesn't exist.
-	// It returns a callback that verifies the host key. When you connect to an SSH server, it presents 
-	// a unique cryptographic "host key" to identify itself. Your SSH client's job is to verify that 
+	// It returns a callback that verifies the host key. When you connect to an SSH server, it presents
+	// a unique cryptographic "host key" to identify itself. Your SSH client's job is to verify that
 	// this key is the correct one for the server you think you're connecting to.
 	callback, err := knownhosts.New(knownHostsPath)
 	if err != nil {

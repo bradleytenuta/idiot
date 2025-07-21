@@ -51,8 +51,8 @@ func runSsh(cmd *cobra.Command, args []string) {
 			if splitErr != nil {
 				host = addr // Fallback to the original address if splitting fails for some reason.
 			}
-			log.Info().Msgf("Host key for %s is not trusted. To trust this host, add its key to your ~/.ssh/known_hosts file." +
-			" You can do this on Linux/macOS by running: ssh-keyscan -H 192.168.86.21 >> ~/.ssh/known_hosts", host)
+			log.Info().Msgf("Host key for %s is not trusted. To trust this host, add its key to your ~/.ssh/known_hosts file."+
+				" You can do this on Linux/macOS by running: ssh-keyscan -H 192.168.86.21 >> ~/.ssh/known_hosts", host)
 		}
 
 		return

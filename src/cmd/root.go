@@ -28,6 +28,8 @@ func Execute() error {
 // It registers the initConfig function to be called by Cobra when it initializes.
 func init() {
 	cobra.OnInitialize(initConfig)
+	// Disable the default 'completion' command
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 // initConfig reads in a config file and ENV variables if set. It also sets up
