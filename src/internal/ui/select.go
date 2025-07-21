@@ -60,6 +60,7 @@ Total IOT Devices found: {{ .Total }}
 func GetPromptInput(label string, mask rune) (string, error) {
 	prompt := promptui.Prompt{
 		Label: label,
+		HideEntered: true,
 	}
 	if mask != 0 {
 		prompt.Mask = mask

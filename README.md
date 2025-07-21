@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images\captainPicard.png" alt="Placeholder Image"/>
+  <img src="images\captainPicard.png" alt="Application Logo"/>
   <h2>IDIOT</h2>
   <p><small><strong>Id</strong>entify <strong>I</strong>nternet <strong>O</strong>f <strong>T</strong>hings<br>A <em>GO</em> command line interface, that enables you to identify and manage internet of things (IOT) on your local network.</p>
   <p>
@@ -7,9 +7,8 @@
     <a href="https://codecov.io/gh/bradleytenuta/idiot"><img src="https://codecov.io/gh/bradleytenuta/idiot/branch/main/graph/badge.svg" alt="codecov"></a>
     <a href="https://github.com/bradleytenuta/idiot/releases/latest"><img src="https://img.shields.io/github/v/release/bradleytenuta/idiot?include_prereleases" alt="Latest Release"></a>
   </p>
+  <img src="images\demo.gif" alt="Demo of application"/>
 </div>
-
-include GIF of using the application.
 
 `idiot` is a command-line tool written in Go for discovering devices on your local network and connecting to them via SSH. It uses a combination of network protocols to build a comprehensive list of connected devices, enriches this data with hostnames and service information, and provides an easy way to initiate an SSH connection.
 
