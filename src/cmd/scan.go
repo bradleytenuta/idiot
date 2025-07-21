@@ -13,6 +13,7 @@ import (
 	"com.bradleytenuta/idiot/internal/ui"
 )
 
+// init registers the scan command with the root command.
 func init() {
 	rootCmd.AddCommand(scanCmd)
 }
@@ -24,6 +25,9 @@ var scanCmd = &cobra.Command{
 	Run:   runScan,
 }
 
+// runScan executes the network scan. It discovers devices using ICMP and mDNS,
+// then enriches the device data with SSH availability and reverse DNS lookups.
+// Finally, it presents an interactive list for the user to select a device to save.
 func runScan(cmd *cobra.Command, args []string) {
 	networkAddr, broadcastAddr, iface, err := network.GetInternetFacingNetworkInfo()
 	if err != nil {
@@ -55,7 +59,6 @@ func runScan(cmd *cobra.Command, args []string) {
 	var wg sync.WaitGroup
 
 	// Phase 1: Discover devices on the network.
-	// These can run concurrently.
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -65,10 +68,9 @@ func runScan(cmd *cobra.Command, args []string) {
 		defer wg.Done()
 		network.PerformIcmpScan(networkAddr, broadcastAddr, discoveredDevices, &mu)
 	}()
-	wg.Wait() // Wait for discovery to complete.
+	wg.Wait()
 
 	// Phase 2: Enrich the discovered device data.
-	// These can also run concurrently now that the initial list is populated.
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
@@ -78,7 +80,7 @@ func runScan(cmd *cobra.Command, args []string) {
 		defer wg.Done()
 		network.PerformReverseDnsLookUp(discoveredDevices, &mu)
 	}()
-	wg.Wait() // Wait for enrichment to complete.
+	wg.Wait()
 
 	close(done) // Stop the spinner.
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestVersionCmd verifies that the version command prints the correct version string.
 func TestVersionCmd(t *testing.T) {
 	// Create a new buffer to capture the command's output.
 	// This buffer will be used as the command's output stream.

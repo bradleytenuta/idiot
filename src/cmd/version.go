@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// init registers the version command with the root command.
 func init() {
 	rootCmd.AddCommand(versionCmd)
 }

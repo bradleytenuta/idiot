@@ -14,6 +14,8 @@ import (
 	"com.bradleytenuta/idiot/internal/model"
 )
 
+// PerformMdnsScan discovers services on the local network using mDNS.
+// It queries for all available services and processes the results concurrently.
 func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
 	// A buffered channel is used to receive service entries from the mDNS query.
 	mdnsEntries := make(chan *mdns.ServiceEntry, 100)
@@ -53,6 +55,9 @@ func PerformMdnsScan(iface *net.Interface, discoveredDevices map[string]*model.D
 	wg.Wait()
 }
 
+// processMdnsEntry handles a single discovered mDNS service. It extracts relevant
+// information like IP addresses and hostname, and then safely updates the shared
+// map of discovered devices.
 func processMdnsEntry(entry *mdns.ServiceEntry, discoveredDevices map[string]*model.Device, mu *sync.Mutex) {
 	if entry.AddrV4 == nil {
 		return
@@ -86,9 +91,9 @@ func processMdnsEntry(entry *mdns.ServiceEntry, discoveredDevices map[string]*mo
 	device.AddSource("mDNS")
 }
 
+// Searches for a model name (e.g., "md=Google Nest Mini")
+// in the InfoFields of an mDNS entry using an idiomatic prefix check.
 func extractModelName(entry *mdns.ServiceEntry) string {
-	// Searches for a model name (e.g., "md=Google Nest Mini")
-	// in the InfoFields of an mDNS entry using an idiomatic prefix check.
 	for _, field := range entry.InfoFields {
 		if modelName, found := strings.CutPrefix(field, "md="); found {
 			return modelName

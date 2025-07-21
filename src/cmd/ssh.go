@@ -1,11 +1,14 @@
 package cmd
 
-// TODO: This looks terrible in windows CMD.
 import (
+	"fmt"
+	"net"
 	"os"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 
@@ -15,6 +18,7 @@ import (
 	"com.bradleytenuta/idiot/internal/ui"
 )
 
+// init registers the ssh command with the root command.
 func init() {
 	rootCmd.AddCommand(sshCmd)
 }
@@ -26,6 +30,9 @@ var sshCmd = &cobra.Command{
 	Run:   runSsh,
 }
 
+// runSsh handles the logic for the "ssh" command. It reads saved devices,
+// prompts the user to select one, gets login credentials, establishes an
+// SSH connection, and starts an interactive terminal session.
 func runSsh(cmd *cobra.Command, args []string) {
 	// We are calling a function that returns another function, and then deferring the execution of the returned function.
 	// This uses the function returned by initTerminal  schedules it to be executed right before the surrounding function exits.
@@ -39,6 +46,15 @@ func runSsh(cmd *cobra.Command, args []string) {
 	client, err := getClient(addr, user, password)
 	if err != nil {
 		log.Error().Msgf("Failed to create client: %v", err)
+		if strings.Contains(err.Error(), "knownhosts: key is unknown") {
+			host, _, splitErr := net.SplitHostPort(addr)
+			if splitErr != nil {
+				host = addr // Fallback to the original address if splitting fails for some reason.
+			}
+			log.Info().Msgf("Host key for %s is not trusted. To trust this host, add its key to your ~/.ssh/known_hosts file." +
+			" You can do this on Linux/macOS by running: ssh-keyscan -H 192.168.86.21 >> ~/.ssh/known_hosts", host)
+		}
+
 		return
 	}
 	defer client.Close()
@@ -51,20 +67,11 @@ func runSsh(cmd *cobra.Command, args []string) {
 	handleInteractiveSession(session)
 }
 
+// getLoginDetails prompts the user to select a device from the saved list
+// and then prompts for a username and password. It returns the selected
+// device's address, the entered credentials, or an error.
 func getLoginDetails(savedDevices []model.Device) (string, string, string, error) {
-	// TODO: Could we replace the map with a slice?
-	// We will create a map where the key is the device's Name.
-	deviceMap := make(map[string]*model.Device)
-	// Iterate over the slice by index. This is crucial for getting
-	// a correct and stable pointer to each element.
-	for i := range savedDevices {
-		// Get a pointer to the device at the current index.
-		device := &savedDevices[i]
-		// Use the device's Name as the key in the new map.
-		deviceMap[device.AddrV4] = device
-	}
-
-	selectedDevice, err := ui.CreateInteractiveSelect(deviceMap)
+	selectedDevice, err := ui.CreateInteractiveSelect(model.ListToMap(savedDevices))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -89,15 +96,24 @@ func getLoginDetails(savedDevices []model.Device) (string, string, string, error
 	return addr, user, password, nil
 }
 
+// getClient establishes an SSH connection to the given address using the
+// provided user and password. It uses a host key callback for security,
+// which can be overridden to an insecure mode via configuration.
 func getClient(addr string, user string, password string) (*ssh.Client, error) {
+	hostKeyCallback, err := network.GetHostKeyCallback()
+	if err != nil {
+		return nil, fmt.Errorf("could not create host key callback from known_hosts: %v", err)
+	} else if !viper.GetBool("ssh_secure_mode") {
+		log.Debug().Msg("SSH secure mode is disabled. Falling back to insecure host key verification.")
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	}
+
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		// TODO: IMPORTANT: In a real-world application, you should use a more secure
-		// HostKeyCallback, like ssh.FixedHostKey or one that checks a known_hosts file.
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 	}
 	client, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
@@ -106,6 +122,9 @@ func getClient(addr string, user string, password string) (*ssh.Client, error) {
 	return client, nil
 }
 
+// handleInteractiveSession sets up and manages an interactive SSH session.
+// It puts the local terminal into raw mode, requests a PTY from the remote
+// server, connects the I/O streams, and starts a remote shell.
 func handleInteractiveSession(session *ssh.Session) {
 	// A file descriptor is a small, non-negative integer that a process uses to identify an open file or other I/O resource
 	// Gets the file descriptor for standard input (os.Stdin). This will almost always be 0.

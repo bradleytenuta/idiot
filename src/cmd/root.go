@@ -18,14 +18,21 @@ var rootCmd = &cobra.Command{
 	Long:  `A GO command line interface, that enables you to identify and manage internet of things (IOT) on your local network.`,
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
 	return rootCmd.Execute()
 }
 
+// init is a special Go function that is called when the package is initialized.
+// It registers the initConfig function to be called by Cobra when it initializes.
 func init() {
 	cobra.OnInitialize(initConfig)
 }
 
+// initConfig reads in a config file and ENV variables if set. It also sets up
+// the global logger based on the debug configuration. If a configuration file
+// does not exist, it creates a default one.
 func initConfig() {
 	executablePath, _ := os.Executable()
 	configFilePath := filepath.Join(filepath.Dir(executablePath), "configuration.yaml")

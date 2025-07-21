@@ -9,12 +9,14 @@ import (
 	"com.bradleytenuta/idiot/internal/model"
 )
 
+// CreateInteractiveSelect displays a list of discovered IoT devices to the user
+// and allows them to select one. It uses promptui to create a rich, interactive list.
 func CreateInteractiveSelect(iotDevices map[string]*model.Device) (*model.Device, error) {
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "> {{ .AddrV4 | cyan }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
 		Inactive: "  {{ .AddrV4 | faint }}\t{{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }}\t{{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
-		Selected: "> You selected {{ .AddrV4 | blue }} {{ if .CanConnectSSH }}{{ \"SSH OK\" | green }}{{ end }} {{ if ne .Hostname \"\" }}{{ .Hostname | magenta }}{{ end }}",
+		Selected: "> You selected {{ .AddrV4 | blue }}{{ if .CanConnectSSH }} {{ \"SSH OK\" | green }}{{ end }}{{ if ne .Hostname \"\" }} {{ .Hostname | magenta }}{{ end }}",
 		Details: `
 Total IOT Devices found: {{ .Total }}
 --------- Device Details ----------
@@ -57,6 +59,8 @@ Total IOT Devices found: {{ .Total }}
 	return selectItems[i].Device, nil
 }
 
+// GetPromptInput displays a prompt to the user and returns the entered string.
+// It can optionally mask the input, which is useful for passwords.
 func GetPromptInput(label string, mask rune) (string, error) {
 	prompt := promptui.Prompt{
 		Label: label,
